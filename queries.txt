@@ -1,0 +1,310 @@
+-- Query to Question 1
+
+WITH basic_tab AS 
+(
+   SELECT
+      f.title AS film_title,
+      c.name AS category_name,
+      rental_duration,
+      NTILE(4) OVER (
+   ORDER BY
+      rental_duration) AS standard_quartile 
+   FROM
+      category c 
+      LEFT JOIN
+         film_category fc 
+         ON c.category_id = fc.category_id 
+      LEFT JOIN
+         film f 
+         ON fc.film_id = f.film_id 
+   WHERE
+      c.name IN 
+      (
+         'Animation',
+         'Children',
+         'Classics',
+         'Comedy',
+         'Family',
+         'Music'
+      )
+)
+SELECT
+   category_name AS category,
+   standard_quartile AS rental_length_category,
+   COUNT(film_title) AS count 
+FROM
+   basic_tab 
+GROUP BY
+   1,
+   2 
+ORDER BY
+   1,
+   2;
+
+
+-- Query to Question 2
+
+SELECT
+   DATE_PART('month', r.rental_date) AS rental_month,
+   DATE_PART('year', r.rental_date) AS rental_year,
+   s.store_id,
+   COUNT(*) AS count_rentals 
+FROM
+   rental r 
+   LEFT JOIN
+      staff s 
+      ON r.staff_id = s.staff_id 
+   LEFT JOIN
+      store st 
+      ON s.store_id = st.store_id 
+GROUP BY
+   1,
+   2,
+   3 
+ORDER BY
+   4 DESC;
+
+
+-- Query to Question 3 
+-- Full year
+
+SELECT
+   pay_month,
+   full_name,
+   SUM(count_of_pay) AS pay_count_per_month,
+   SUM(count_of_pay * amount) AS pay_amount 
+FROM
+   (
+      SELECT
+         DATE_TRUNC('month', p.payment_date) AS pay_month,
+         CONCAT(c.first_name, ' ', c.last_name) AS full_name,
+         COUNT(sub1.customer_id) AS count_of_pay,
+         p.amount 
+      FROM
+         (
+            SELECT
+               customer_id,
+               SUM(amount) AS sum_amt 
+            FROM
+               payment 
+            GROUP BY
+               1 
+            ORDER BY
+               2 DESC LIMIT 10
+         )
+         AS sub1 
+         JOIN
+            payment p 
+            ON sub1.customer_id = p.customer_id 
+         JOIN
+            customer c 
+            ON p.customer_id = c.customer_id 
+      GROUP BY
+         2,
+         1,
+         4 
+      ORDER BY
+         2,
+         1
+   )
+   AS sub2 
+GROUP BY
+   1,
+   2 
+ORDER BY
+   2;
+
+
+-- Query to Question 3 
+-- Only for March
+
+
+SELECT
+   pay_month,
+   full_name,
+   SUM(count_of_pay) AS pay_count_per_month,
+   SUM(count_of_pay * amount) AS pay_amount 
+FROM
+   (
+      SELECT
+         DATE_TRUNC('month', p.payment_date) AS pay_month,
+         CONCAT(c.first_name, ' ', c.last_name) AS full_name,
+         COUNT(sub1.customer_id) AS count_of_pay,
+         p.amount 
+      FROM
+         (
+            SELECT
+               customer_id,
+               SUM(amount) AS sum_amt 
+            FROM
+               payment 
+            GROUP BY
+               1 
+            ORDER BY
+               2 DESC LIMIT 10
+         )
+         AS sub1 
+         JOIN
+            payment p 
+            ON sub1.customer_id = p.customer_id 
+         JOIN
+            customer c 
+            ON p.customer_id = c.customer_id 
+      GROUP BY
+         2,
+         1,
+         4 
+      ORDER BY
+         2,
+         1
+   )
+	 AS sub2 
+WHERE DATE_PART('month', pay_month) = 3   
+GROUP BY
+   1,
+   2 
+ORDER BY
+   2;
+
+
+-- Query to Question 4
+-- pre_query, difference
+
+WITH difference_table AS 
+(
+   SELECT
+      pay_month,
+      full_name,
+      SUM(count_of_pay) AS pay_count_per_month,
+      SUM(count_of_pay * amount) AS pay_amount 
+   FROM
+      (
+         SELECT
+            DATE_TRUNC('month', p.payment_date) AS pay_month,
+            CONCAT(c.first_name, ' ', c.last_name) AS full_name,
+            COUNT(sub1.customer_id) AS count_of_pay,
+            p.amount 
+         FROM
+            (
+               SELECT
+                  customer_id,
+                  SUM(amount) AS sum_amt 
+               FROM
+                  payment 
+               GROUP BY
+                  1 
+               ORDER BY
+                  2 DESC LIMIT 10
+            )
+            AS sub1 
+            JOIN
+               payment p 
+               ON sub1.customer_id = p.customer_id 
+            JOIN
+               customer c 
+               ON p.customer_id = c.customer_id 
+         GROUP BY
+            2,
+            1,
+            4 
+         ORDER BY
+            2,
+            1
+      )
+      AS sub2 
+   GROUP BY
+      1,
+      2 
+   ORDER BY
+      2 
+)
+SELECT
+   pay_month,
+   full_name,
+   pay_amount AS current_month_amt,
+   LEAD(pay_amount) OVER (
+ORDER BY
+   full_name) AS next_month_amt,
+   LEAD(pay_amount) OVER (
+ORDER BY
+   full_name) - pay_amount AS difference 
+FROM
+   difference_table;
+
+
+-- Query to Question 4
+-- final result
+
+WITH final_result_table AS 
+(
+   WITH difference_table AS 
+   (
+      SELECT
+         pay_month,
+         full_name,
+         SUM(count_of_pay) AS pay_count_per_month,
+         SUM(count_of_pay * amount) AS pay_amount 
+      FROM
+         (
+            SELECT
+               DATE_TRUNC('month', p.payment_date) AS pay_month,
+               CONCAT(c.first_name, ' ', c.last_name) AS full_name,
+               COUNT(sub1.customer_id) AS count_of_pay,
+               p.amount 
+            FROM
+               (
+                  SELECT
+                     customer_id,
+                     SUM(amount) AS sum_amt 
+                  FROM
+                     payment 
+                  GROUP BY
+                     1 
+                  ORDER BY
+                     2 DESC LIMIT 10
+               )
+               AS sub1 
+               JOIN
+                  payment p 
+                  ON sub1.customer_id = p.customer_id 
+               JOIN
+                  customer c 
+                  ON p.customer_id = c.customer_id 
+            GROUP BY
+               2,
+               1,
+               4 
+            ORDER BY
+               2,
+               1
+         )
+         AS sub2 
+      GROUP BY
+         1,
+         2 
+      ORDER BY
+         2 
+   )
+   SELECT
+      pay_month,
+      full_name,
+      pay_amount AS current_month_amt,
+      LEAD(pay_amount) OVER (
+   ORDER BY
+      full_name) AS next_month_amt,
+      LEAD(pay_amount) OVER (
+   ORDER BY
+      full_name) - pay_amount AS difference 
+   FROM
+      difference_table 
+)
+SELECT
+   full_name,
+   MAX(difference) AS biggest_diff 
+FROM
+   final_result_table 
+GROUP BY
+   1 
+ORDER BY
+   2 DESC LIMIT 1;
+
